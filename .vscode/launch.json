@@ -1,0 +1,42 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug MuSc",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/musc_main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--device",
+                "0",
+                "--data_path",
+                "./data/mvtec_anomaly_detection/",
+                "--dataset_name",
+                "mvtec_ad",
+                "--class_name",
+                "bottle",
+                "--backbone_name",
+                "ViT-L-14-336",
+                "--pretrained",
+                "openai",
+                "--feature_layers",
+                "5",
+                "--img_resize",
+                "518",
+                "--divide_num",
+                "1",
+                "--r_list",
+                "1",
+                "--batch_size",
+                "4",
+                "--output_dir",
+                "./output",
+                "--vis",
+                "True",
+                "--save_excel",
+                "True"
+            ]
+        }
+    ]
+}

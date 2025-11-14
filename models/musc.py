@@ -32,6 +32,7 @@ class MuSc():
     def __init__(self, cfg, seed=0):
         self.cfg = cfg
         self.seed = seed
+        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = torch.device("cuda:{}".format(cfg['device']) if torch.cuda.is_available() else "cpu")
 
         self.path = cfg['datasets']['data_path']
