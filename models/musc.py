@@ -72,7 +72,7 @@ class MuSc():
             self.dino_model.to(self.device)
             self.preprocess = None
         else:
-            # clip
+            # clip ,下方函数返回return model, preprocess_train, preprocess_val
             self.clip_model, _, self.preprocess = open_clip.create_model_and_transforms(self.model_name, self.image_size, pretrained=self.pretrained)
             self.clip_model.to(self.device)
 
@@ -175,16 +175,16 @@ class MuSc():
                         image_features, patch_tokens = self.clip_model.encode_image(input_image, self.features_list)
                         image_features /= image_features.norm(dim=-1, keepdim=True)
                         patch_tokens = [patch_tokens[l].cpu() for l in range(len(self.features_list))]
-                image_features = [image_features[bi].squeeze().cpu().numpy() for bi in range(image_features.shape[0])]
+                image_features = [image_features[bi].squeeze().cpu().numpy() for bi in range(image_features.shape[0])]#这里变为了列表，列表中有b_s个数组
                 class_tokens.extend(image_features)
                 patch_tokens_list.append(patch_tokens)  # (B, L+1, C)
-            end_time = time.time()
-            print('extract time: {}ms per image'.format((end_time-start_time)*1000/subset_num))
+            end_time = time.time()#cl_tokens83长的768维数组列表,p_t_l21长[bs,1370,1024]
+            print('extract time: {}ms per image'.format((end_time-start_time)*1000/subset_num))#处理每张图片用了多少毫秒
             
             # LNAMD
             feature_dim = patch_tokens_list[0][0].shape[-1]
             anomaly_maps_r = torch.tensor([]).double()
-            for r in self.r_list:
+            for r in self.r_list:#不同r的列表
                 start_time = time.time()
                 print('aggregation degree: {}'.format(r))
                 LNAMD_r = LNAMD(device=self.device, r=r, feature_dim=feature_dim, feature_layer=self.features_list)
@@ -192,7 +192,7 @@ class MuSc():
                 for im in range(len(patch_tokens_list)):
                     patch_tokens = [p.to(self.device) for p in patch_tokens_list[im]]
                     with torch.no_grad(), torch.cuda.amp.autocast():
-                        features = LNAMD_r._embed(patch_tokens)
+                        features = LNAMD_r._embed(patch_tokens)#[B,1369,2,1024]
                         features /= features.norm(dim=-1, keepdim=True)
                         for l in range(len(self.features_list)):
                             # save the aggregated features
@@ -205,18 +205,18 @@ class MuSc():
                 # MSM
                 anomaly_maps_l = torch.tensor([]).double()
                 start_time = time.time()
-                for l in Z_layers.keys():
+                for l in Z_layers.keys():#Z_layers为字典，层数为键值数，值为20的列表
                     # different layers
-                    Z = torch.cat(Z_layers[l], dim=0).to(self.device) # (N, L, C)
+                    Z = torch.cat(Z_layers[l], dim=0).to(self.device) # (83, 1369, 1024)
                     print('layer-{} mutual scoring...'.format(l))
-                    anomaly_maps_msm = MSM(Z=Z, device=self.device, topmin_min=0, topmin_max=0.3)
+                    anomaly_maps_msm = MSM(Z=Z, device=self.device, topmin_min=0, topmin_max=0.3)#(83,1369)
                     anomaly_maps_l = torch.cat((anomaly_maps_l, anomaly_maps_msm.unsqueeze(0).cpu()), dim=0)
-                    torch.cuda.empty_cache()
-                anomaly_maps_l = torch.mean(anomaly_maps_l, 0)
-                anomaly_maps_r = torch.cat((anomaly_maps_r, anomaly_maps_l.unsqueeze(0)), dim=0)
+                    torch.cuda.empty_cache()#(2,83,1369)
+                anomaly_maps_l = torch.mean(anomaly_maps_l, 0)#(83,1369)
+                anomaly_maps_r = torch.cat((anomaly_maps_r, anomaly_maps_l.unsqueeze(0)), dim=0)#(r,83,1369)
                 end_time = time.time()
                 print('MSM: {}ms per image'.format((end_time-start_time)*1000/subset_num))
-            anomaly_maps_iter = torch.mean(anomaly_maps_r, 0).to(self.device)
+            anomaly_maps_iter = torch.mean(anomaly_maps_r, 0).to(self.device)#取不同r的均值(83,1369)
             del anomaly_maps_r
             torch.cuda.empty_cache()
 
@@ -238,7 +238,7 @@ class MuSc():
         torch.cuda.empty_cache()
 
         B = anomaly_maps.shape[0]   # the number of unlabeled test images
-        ac_score = np.array(anomaly_maps).reshape(B, -1).max(-1)
+        ac_score = np.array(anomaly_maps).reshape(B, -1).max(-1)#(83,)
         # RsCIN
         if self.dataset == 'visa':
             k_score = [1, 8, 9]
@@ -246,14 +246,14 @@ class MuSc():
             k_score = [1, 2, 3]
         else:
             k_score = [1, 2, 3]
-        scores_cls = RsCIN(ac_score, class_tokens, k_list=k_score)
+        scores_cls = RsCIN(ac_score, class_tokens, k_list=k_score)#返回的仍然是83维数组，但经过了改进
 
         print('computing metrics...')
-        pr_sp = np.array(scores_cls)
-        gt_sp = np.array(gt_list)
-        gt_px = torch.cat(img_masks, dim=0).numpy().astype(np.int32)
-        pr_px = np.array(anomaly_maps)
-        image_metric, pixel_metric = compute_metrics(gt_sp, pr_sp, gt_px, pr_px)
+        pr_sp = np.array(scores_cls)#图片级别的异常分数
+        gt_sp = np.array(gt_list)#真实标签0，1
+        gt_px = torch.cat(img_masks, dim=0).numpy().astype(np.int32)#每张图片的每个像素点的真实标签
+        pr_px = np.array(anomaly_maps)#每张图片的每个像素点的异常分数
+        image_metric, pixel_metric = compute_metrics(gt_sp, pr_sp, gt_px, pr_px)#计算各项指标
         auroc_sp, f1_sp, ap_sp = image_metric
         auroc_px, f1_px, ap_px, aupro = pixel_metric
         print(category)

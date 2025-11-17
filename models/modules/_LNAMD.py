@@ -17,7 +17,7 @@ class PatchMaker:
         padding = int((self.patchsize - 1) / 2)
         unfolder = torch.nn.Unfold(
             kernel_size=self.patchsize, stride=self.stride, padding=padding, dilation=1
-        )
+        )#借鉴了一个精妙的滑动拼接方法
         unfolded_features = unfolder(features)
         number_of_total_patches = []
         for s in features.shape[-2:]:
@@ -73,7 +73,7 @@ class LNAMD(torch.nn.Module):
         B = features[0].shape[0]
 
         features_layers = []
-        for feature in features:
+        for feature in features:#不同层依次取出张量
             # reshape and layer normalization
             feature = feature[:, 1:, :] # remove the cls token
             feature = feature.reshape(feature.shape[0],
@@ -125,7 +125,7 @@ class LNAMD(torch.nn.Module):
         features_layers = self.LNA(features_layers)
         features_layers = features_layers.reshape(B, -1, *features_layers.shape[-2:])   # (B, L, layer, C)
 
-        return features_layers.detach().cpu()
+        return features_layers.detach().cpu()#[B,1369,2,1024]至此已经完成了r=3的特征聚合
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ def cal_pro_score(masks, amaps, max_step=200, expect_fpr=0.3):
         for binary_amap, mask in zip(binary_amaps, masks):
             for region in measure.regionprops(measure.label(mask)):
                 tp_pixels = binary_amap[region.coords[:, 0], region.coords[:, 1]].sum()
-                pro.append(tp_pixels / region.area)
+                pro.append(tp_pixels / region.area)#一块区域的真阳性率
         inverse_masks = 1 - masks
         fp_pixels = np.logical_and(inverse_masks, binary_amaps).sum()
         fpr = fp_pixels / inverse_masks.sum()
@@ -37,7 +37,7 @@ def compute_metrics(gt_sp=None, pr_sp=None, gt_px=None, pr_px=None):
         auroc_sp = roc_auc_score(gt_sp, pr_sp)
         ap_sp = average_precision_score(gt_sp, pr_sp)
         precisions, recalls, thresholds = precision_recall_curve(gt_sp, pr_sp)
-        f1_scores = (2 * precisions * recalls) / (precisions + recalls)
+        f1_scores = (2 * precisions * recalls) / (precisions + recalls)#谐波平均值
         f1_sp = np.max(f1_scores[np.isfinite(f1_scores)])
 
     # segmentation

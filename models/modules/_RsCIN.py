@@ -5,14 +5,14 @@ import pickle
 def MMO(W, score, k_list=[1, 2, 3]):
     S_list = []
     for k in k_list:
-        _, topk_matrix = torch.topk(W.float(), W.shape[0]-k, largest=False, sorted=True)
+        _, topk_matrix = torch.topk(W.float(), W.shape[0]-k, largest=False, sorted=True)#(83,82)
         W_mask = W.clone()
         for i in range(W.shape[0]):
             W_mask[i, topk_matrix[i]] = 0
-        n = W.shape[-1]
+        n = W.shape[-1]#83
         D_ = torch.zeros_like(W).float()
         for i in range(n):
-            D_[i, i] = 1 / (W_mask[i,:].sum())
+            D_[i, i] = 1 / (W_mask[i,:].sum())#始终为对角阵
         P = D_ @ W_mask
         S = score.clone().unsqueeze(-1)
         S = P @ S

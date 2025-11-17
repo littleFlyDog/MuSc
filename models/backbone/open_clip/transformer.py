@@ -370,7 +370,7 @@ class VisionTransformer(nn.Module):
 
         # whether to layernorm each patch, as done in dual patchnorm paper - https://arxiv.org/abs/2302.01327v1
         self.input_patchnorm = input_patchnorm
-
+#需要理解一下
         if input_patchnorm:
             patch_input_dim = patch_height * patch_width * 3
             self.patchnorm_pre_ln = LayerNorm(patch_input_dim)
@@ -379,9 +379,9 @@ class VisionTransformer(nn.Module):
             self.patchnorm_pre_ln = nn.Identity()
             self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size,
                                    bias=False)
-
+        #一定要对初始的cls_embedding进行初始化,防止值过大
         # class embeddings and positional embeddings
-        scale = width ** -0.5
+        scale = width ** -0.5#0.03125
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
         self.positional_embedding = nn.Parameter(scale * torch.randn(self.grid_size[0] * self.grid_size[1] + 1, width))
 
@@ -588,7 +588,7 @@ class VisionTransformer(nn.Module):
         H = int(np.sqrt(L-1))
         out_attn = torch.zeros([H, H]).to(x.device)
         for i in range(len(attn)):
-            out_attn += attn[i][0, 0, 1:].view(H, H)
+            out_attn += attn[i][0, 0, 1:].view(H, H)#比较精妙的部分，把每个特征层的相加
         x = x.permute(1, 0, 2)  # LND -> NLD
         patch_tokens = [patch_tokens[t].permute(1, 0, 2) for t in range(len(patch_tokens))]  # LND -> NLD
         # patch_tokens = patch_tokens.permute(1, 0, 2)  # LND -> NLD
@@ -607,7 +607,7 @@ class VisionTransformer(nn.Module):
             pooled = pooled @ self.proj
             # patch_tokens = patch_tokens @ self.proj  # 不知道能不能行
             # tokens = tokens @ self.proj
-
+#输出为[b_s,768]
         if self.output_tokens:
             return pooled, patch_tokens
 

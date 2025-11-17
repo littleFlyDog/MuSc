@@ -8,6 +8,8 @@ By default, our program uses the following function, which is slower but consume
 """
 
 def compute_scores_fast(Z, i, device, topmin_min=0, topmin_max=0.3):
+    #q:思路，是不是可以考虑使用余弦相似度？
+    #a:可以尝试，但效果可能会有所不同，需进行实验验证。
     # speed fast but space large
     # compute anomaly scores
     image_num, patch_num, c = Z.shape
@@ -23,11 +25,11 @@ def compute_scores_fast(Z, i, device, topmin_min=0, topmin_max=0.3):
     if k_min < 1:
         k_min = int(patch2image.shape[1]*k_min)
     if k_max < k_min:
-        k_max, k_min = k_min, k_max
+        k_max, k_min = k_min, k_max#选出指定个数个照片
     vals, _ = torch.topk(patch2image.float(), k_max, largest=False, sorted=True)
     vals, _ = torch.topk(vals.float(), k_max-k_min, largest=True, sorted=True)
     patch2image = vals.clone()
-    return torch.mean(patch2image, dim=1)
+    return torch.mean(patch2image, dim=1)#这里对最后一维求均值，shape为[1369，]
 
 def compute_scores_slow(Z, i, device, topmin_min=0, topmin_max=0.3):
     # space small but speed slow
@@ -54,9 +56,9 @@ def MSM(Z, device, topmin_min=0, topmin_max=0.3):
     anomaly_scores_matrix = torch.tensor([]).double().to(device)
     for i in tqdm(range(Z.shape[0])):
     # for i in range(Z.shape[0]):
-        anomaly_scores_i = compute_scores_fast(Z, i, device, topmin_min, topmin_max).unsqueeze(0)
+        anomaly_scores_i = compute_scores_fast(Z, i, device, topmin_min, topmin_max).unsqueeze(0)#照片1的异常分数，必须为其他照片的同层同r的所有patch的距离最小值   
         anomaly_scores_matrix = torch.cat((anomaly_scores_matrix, anomaly_scores_i.double()), dim=0)    # (N, B)
-    return anomaly_scores_matrix
+    return anomaly_scores_matrix#(照片数，patch数)对应每个照片每个patch的异常分数
 
 if __name__ == "__main__":
     device = 'cuda:0'

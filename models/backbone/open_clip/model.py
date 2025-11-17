@@ -108,7 +108,7 @@ def _build_vision_tower(
             image_size=vision_cfg.image_size,
             width=vision_cfg.width,
         )
-    else:
+    else:#witdth=1024,head_width=64默认即为64
         vision_heads = vision_cfg.width // vision_cfg.head_width
         norm_layer = LayerNormFp32 if cast_dtype in (torch.float16, torch.bfloat16) else LayerNorm
         visual = VisionTransformer(
@@ -299,7 +299,7 @@ def convert_weights_to_lp(model: nn.Module, dtype=torch.float16):
 
         if isinstance(l, (nn.MultiheadAttention, Attention)):
             for attr in [*[f"{s}_proj_weight" for s in ["in", "q", "k", "v"]], "in_proj_bias", "bias_k", "bias_v"]:
-                tensor = getattr(l, attr)
+                tensor = getattr(l, attr)  # 这是一种灵活动态写法
                 if tensor is not None:
                     tensor.data = tensor.data.to(dtype)
 
@@ -341,13 +341,13 @@ def build_model_from_openai_state_dict(
 ):
     vit = "visual.proj" in state_dict
 
-    if vit:
+    if vit:#vision_width是conv1的输出通道数1024
         vision_width = state_dict["visual.conv1.weight"].shape[0]
         vision_layers = len(
-            [k for k in state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")])
-        vision_patch_size = state_dict["visual.conv1.weight"].shape[-1]
+            [k for k in state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")])#这里是找出有多少个transformer layer
+        vision_patch_size = state_dict["visual.conv1.weight"].shape[-1]#是卷积核的大小，就是patch_size
         grid_size = round((state_dict["visual.positional_embedding"].shape[0] - 1) ** 0.5)
-        image_size = vision_patch_size * grid_size
+        image_size = vision_patch_size * grid_size#得到的输入图像的大小336*336
     else:
         counts: list = [
             len(set(k.split(".")[2] for k in state_dict if k.startswith(f"visual.layer{b}"))) for b in [1, 2, 3, 4]]
@@ -357,13 +357,13 @@ def build_model_from_openai_state_dict(
         vision_patch_size = None
         assert output_width ** 2 + 1 == state_dict["visual.attnpool.positional_embedding"].shape[0]
         image_size = output_width * 32
-
-    embed_dim = state_dict["text_projection"].shape[1]
-    context_length = state_dict["positional_embedding"].shape[0]
-    vocab_size = state_dict["token_embedding.weight"].shape[0]
-    transformer_width = state_dict["ln_final.weight"].shape[0]
-    transformer_heads = transformer_width // 64
-    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
+#凡是前面没有vision的，一律为text部分
+    embed_dim = state_dict["text_projection"].shape[1]#768
+    context_length = state_dict["positional_embedding"].shape[0]#77
+    vocab_size = state_dict["token_embedding.weight"].shape[0]#49408
+    transformer_width = state_dict["ln_final.weight"].shape[0]#768
+    transformer_heads = transformer_width // 64#12
+    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))#
 
     vision_cfg = CLIPVisionCfg(
         layers=vision_layers,
@@ -379,7 +379,7 @@ def build_model_from_openai_state_dict(
         layers=transformer_layers,
     )
     model = CLIP(
-        embed_dim,
+        embed_dim,#768
         vision_cfg=vision_cfg,
         text_cfg=text_cfg,
         quick_gelu=quick_gelu,  # OpenAI models were trained with QuickGELU

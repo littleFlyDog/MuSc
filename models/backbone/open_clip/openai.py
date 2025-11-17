@@ -81,7 +81,7 @@ def load_openai_model(
             sd = {k[7:]: v for k, v in state_dict["state_dict"].items()}
             model = build_model_from_openai_state_dict(sd, cast_dtype=cast_dtype)
 
-        # model from OpenAI state dict is in manually cast fp16 mode, must be converted for AMP/fp32/bf16 use
+        # model from OpenAI state dict is in manually cast fp16 mode, must be converted for AMP/fp32/bf16 use，至此处，终于完成了model.load_state_dict(state_dict)，过于漫长
         model = model.to(device)
         if precision.startswith('amp') or precision == 'fp32':
             model.float()
